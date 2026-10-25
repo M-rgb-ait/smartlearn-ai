@@ -82,14 +82,24 @@ function QuizComponent({ questions }: QuizProps) {
               const selected = answers[index] === optionIndex;
               const correct = optionIndex === question.correctAnswer;
 
-              let optionClass = "flex items-start gap-3 rounded-lg border p-3";
+              let optionClass =
+                "flex items-start gap-3 rounded-xl border-2 p-4 transition-all duration-200";
 
               if (submitted && correct) {
-                optionClass += " border-green-600 bg-green-50 text-green-900";
+                optionClass +=
+                  " border-green-500 bg-green-50 text-green-800 dark:border-green-500 dark:bg-green-950/40 dark:text-green-300";
               } else if (submitted && selected && !correct) {
-                optionClass += " border-red-600 bg-red-50 text-red-900";
+                optionClass +=
+                  " border-red-500 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950/40 dark:text-red-300";
               } else if (selected) {
-                optionClass += " border-blue-600 bg-blue-50";
+                optionClass +=
+                  " border-blue-500 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300";
+              } else if (!submitted) {
+                optionClass +=
+                  " border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500 dark:hover:bg-blue-950/20";
+              } else {
+                optionClass +=
+                  " border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400";
               }
 
               return (
@@ -106,9 +116,24 @@ function QuizComponent({ questions }: QuizProps) {
                     checked={selected}
                     disabled={submitted}
                     onChange={() => handleAnswer(index, optionIndex)}
-                    className="mt-1"
+                    className="mt-1 size-4 shrink-0 accent-blue-600"
                   />
-                  <span>{option}</span>
+
+                  <span className="flex-1 text-sm font-medium leading-6">
+                    {option}
+                  </span>
+
+                  {submitted && correct && (
+                    <span className="shrink-0 text-sm font-bold text-green-600 dark:text-green-400">
+                      ✓ Correct
+                    </span>
+                  )}
+
+                  {submitted && selected && !correct && (
+                    <span className="shrink-0 text-sm font-bold text-red-600 dark:text-red-400">
+                      ✕ Incorrect
+                    </span>
+                  )}
                 </label>
               );
             })}
