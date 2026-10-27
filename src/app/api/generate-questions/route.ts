@@ -1,11 +1,20 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const apiKey = process.env.GEMINI_API_KEY;
+
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export async function POST(request: Request) {
   try {
+    if (!ai) {
+      console.error("GEMINI_API_KEY is missing");
+
+      return Response.json(
+        { error: "Gemini API key is not configured." },
+        { status: 500 },
+      );
+    }
+
     const body = await request.json();
     const { text, numberOfQuestions = 5 } = body;
 
@@ -61,11 +70,35 @@ ${text.slice(0, 30000)}
       success: true,
       questions: result.questions,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Question generation failed:", error);
 
+    const apiError = error as {
+      status?: number;
+      message?: string;
+    };
+
+    const status = apiError.status;
+
+    if (status === 429) {
+      return Response.json(
+        {
+          error:
+            "Gemini request limit or quota exceeded. Please try again later.",
+        },
+        { status: 429 },
+      );
+    }
+
+    if (status === 401 || status === 403) {
+      return Response.json(
+        { error: "Gemini API key is invalid or does not have permission." },
+        { status: 502 },
+      );
+    }
+
     return Response.json(
-      { error: "Failed to generate questions" },
+      { error: "Failed to generate questions." },
       { status: 500 },
     );
   }

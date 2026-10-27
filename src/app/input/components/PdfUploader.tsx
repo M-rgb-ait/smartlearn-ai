@@ -28,77 +28,112 @@ function PdfUploaderComponent() {
   const loading = uploadMutation.isPending || questionsMutation.isPending;
 
   const [error, setError] = useState("");
+  // Clear previous quiz
+  // questionsMutation.reset();
+  // uploadMutation.reset();
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
-    const selectedFile = input.files?.[0];
+    const selectedFiles = Array.from(input.files ?? []);
 
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
-    if (
-      selectedFile.type !== "application/pdf" &&
-      !selectedFile.name.toLowerCase().endsWith(".pdf")
-    ) {
-      setError("Please select a valid PDF file.");
+    const invalidFile = selectedFiles.find(
+      (file) =>
+        file.type !== "application/pdf" &&
+        !file.name.toLowerCase().endsWith(".pdf"),
+    );
+
+    if (invalidFile) {
+      setError("Please select PDF files only.");
       input.value = "";
       return;
     }
 
     setError("");
 
-    // Clear previous quiz
-    questionsMutation.reset();
-    uploadMutation.reset();
-
-    localStorage.removeItem("questions");
-    queryClient.setQueryData(["savedQuestions"], []);
-
     try {
-      // 1. Upload PDF
-      const uploadData = await uploadMutation.mutateAsync(selectedFile);
+      for (const selectedFile of selectedFiles) {
+        // Upload PDF
+        const uploadData = await uploadMutation.mutateAsync(selectedFile);
 
-      if (
-        typeof uploadData.extractedText !== "string" ||
-        !uploadData.extractedText.trim()
-      ) {
-        throw new Error("No text was extracted from the PDF.");
+        if (
+          typeof uploadData.extractedText !== "string" ||
+          !uploadData.extractedText.trim()
+        ) {
+          throw new Error(`No text was extracted from ${selectedFile.name}.`);
+        }
+
+        // Generate questions
+        const generatedQuestions = await questionsMutation.mutateAsync({
+          text: uploadData.extractedText,
+          numberOfQuestions: 5,
+        });
+
+        const fileId = crypto.randomUUID();
+
+        const questionsWithFileId = generatedQuestions.map((question) => ({
+          ...question,
+          fileId,
+        }));
+
+        // Save questions
+        const savedQuestions = JSON.parse(
+          localStorage.getItem("questions") || "[]",
+        );
+
+        const updatedQuestions = [...savedQuestions, ...questionsWithFileId];
+
+        localStorage.setItem("questions", JSON.stringify(updatedQuestions));
+
+        queryClient.setQueryData(["savedQuestions"], updatedQuestions);
+
+        // Save file metadata
+        const savedFiles: SavedFile[] = JSON.parse(
+          localStorage.getItem("files") || "[]",
+        );
+
+        const updatedFiles = [
+          ...savedFiles,
+          {
+            id: fileId,
+            name: selectedFile.name,
+            size: selectedFile.size,
+            type: selectedFile.type,
+          },
+        ];
+
+        localStorage.setItem("files", JSON.stringify(updatedFiles));
+
+        queryClient.setQueryData(["savedFiles"], updatedFiles);
       }
-
-      // 2. Generate questions
-      const generatedQuestions = await questionsMutation.mutateAsync({
-        text: uploadData.extractedText,
-        numberOfQuestions: 5,
-      });
-
-      // 3. Save questions
-      localStorage.setItem("questions", JSON.stringify(generatedQuestions));
-
-      queryClient.setQueryData(["savedQuestions"], generatedQuestions);
-
-      // 4. Save file metadata
-      const savedFiles: SavedFile[] = JSON.parse(
-        localStorage.getItem("files") || "[]",
-      );
-
-      const updatedFiles = [
-        ...savedFiles,
-        {
-          name: selectedFile.name,
-          size: selectedFile.size,
-          type: selectedFile.type,
-        },
-      ];
-
-      localStorage.setItem("files", JSON.stringify(updatedFiles));
-
-      queryClient.setQueryData(["savedFiles"], updatedFiles);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       input.value = "";
     }
   }
+  function handleDeleteFile(fileId: string) {
+    const savedFiles: SavedFile[] = JSON.parse(
+      localStorage.getItem("files") || "[]",
+    );
 
+    const updatedFiles = savedFiles.filter((file) => file.id !== fileId);
+
+    localStorage.setItem("files", JSON.stringify(updatedFiles));
+    queryClient.setQueryData(["savedFiles"], updatedFiles);
+
+    const savedQuestions = JSON.parse(
+      localStorage.getItem("questions") || "[]",
+    );
+
+    const updatedQuestions = savedQuestions.filter(
+      (question: { fileId: string }) => question.fileId !== fileId,
+    );
+
+    localStorage.setItem("questions", JSON.stringify(updatedQuestions));
+    queryClient.setQueryData(["savedQuestions"], updatedQuestions);
+  }
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
       {/* PDF Upload */}
@@ -138,6 +173,7 @@ function PdfUploaderComponent() {
             id="pdf-file"
             type="file"
             accept="application/pdf,.pdf"
+            multiple
             onChange={handleFileChange}
             disabled={loading}
             className="sr-only"
@@ -168,19 +204,27 @@ function PdfUploaderComponent() {
             {savedFilesName.map((file, index) => (
               <li
                 key={`${file.name}-${index}`}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700"
+                className="flex items-center gap-3 rounded-xl border border-gray-200 p-3"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-sm font-bold text-red-600 dark:bg-red-950/40 dark:text-red-400">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-sm font-bold text-red-600">
                   PDF
                 </span>
 
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">
                   {file.name}
                 </span>
 
-                <span className="text-xs text-green-600 dark:text-green-400">
-                  Saved
-                </span>
+                <span className="text-xs text-green-600">Saved</span>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteFile(file.id)}
+                  aria-label={`Delete ${file.name}`}
+                  title="Delete file"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <span className="text-xl font-bold">✕</span>
+                </button>
               </li>
             ))}
           </ul>

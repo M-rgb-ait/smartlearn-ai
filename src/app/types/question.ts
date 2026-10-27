@@ -14,6 +14,7 @@ export type UploadPdfResponse = {
 };
 
 export type SavedFile = {
+  id: string;
   name: string;
   size: number;
   type: string;
