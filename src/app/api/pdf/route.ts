@@ -1,7 +1,29 @@
+import { getClientIp, isRateLimited } from "@/app/utils/rateLimit";
 import { extractText, getDocumentProxy } from "unpdf";
+
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
+const MAX_TEXT_CHARS = 500_000;
+
+const RATE_LIMIT = 20; // طلبات في الدقيقة (الرفع المتعدد بيعمل أكتر من طلب)
 
 export async function POST(request: Request) {
   try {
+    if (await isRateLimited("pdf", getClientIp(request), RATE_LIMIT)) {
+      return Response.json(
+        { error: "Too many requests. Please wait a minute and try again." },
+        { status: 429 },
+      );
+    }
+
+    // فحص الحجم المعلن قبل قراءة الـ body (هامش بسيط لـ multipart overhead)
+    const declaredLength = Number(request.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_PDF_BYTES + 100_000) {
+      return Response.json(
+        { error: "PDF size must not exceed 4 MB" },
+        { status: 413 },
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -9,33 +31,33 @@ export async function POST(request: Request) {
       return Response.json({ error: "PDF file is required" }, { status: 400 });
     }
 
-    if (
-      file.type !== "application/pdf" ||
-      !file.name.toLowerCase().endsWith(".pdf")
-    ) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
       return Response.json(
         { error: "Only PDF files are allowed" },
         { status: 400 },
       );
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_PDF_BYTES) {
       return Response.json(
-        { error: "PDF size must not exceed 10 MB" },
+        { error: "PDF size must not exceed 4 MB" },
         { status: 413 },
       );
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const bytes = new Uint8Array(await file.arrayBuffer());
 
-    // استخراج النص من محتوى PDF
-    const pdf = await getDocumentProxy(new Uint8Array(bytes));
+    // كل PDF حقيقي بيبدأ بـ %PDF-
+    const header = new TextDecoder("latin1").decode(bytes.subarray(0, 5));
+    if (header !== "%PDF-") {
+      return Response.json({ error: "Invalid PDF file" }, { status: 400 });
+    }
 
-    const result = await extractText(pdf, {
-      mergePages: true,
-    });
+    const pdf = await getDocumentProxy(bytes);
+    const result = await extractText(pdf, { mergePages: true });
 
-    const extractedText = result.text.trim();
+    // نقص النص الطويل بدل ما نرفض الملف (الـ API التاني بيعمل sampling على أي حال)
+    const extractedText = result.text.trim().slice(0, MAX_TEXT_CHARS);
 
     if (!extractedText) {
       return Response.json(
@@ -49,9 +71,9 @@ export async function POST(request: Request) {
     return Response.json(
       {
         message: "PDF uploaded and text extracted successfully",
-        originalName: file.name,
-        // storedFileName,
+        fileName: file.name,
         fileSize: file.size,
+        fileType: file.type,
         extractedText,
       },
       { status: 201 },
@@ -60,10 +82,7 @@ export async function POST(request: Request) {
     console.error("PDF processing error:", error);
 
     return Response.json(
-      {
-        error: "Failed to process PDF",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Failed to process PDF. The file may be corrupted." },
       { status: 500 },
     );
   }

@@ -1,8 +1,7 @@
-export type Question = {
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation?: string;
+import { GeneratedQuestion } from "@/schemas/question.schema";
+
+export type Question = GeneratedQuestion & {
+  fileId?: string;
 };
 
 export type UploadPdfResponse = {
@@ -18,4 +17,6 @@ export type SavedFile = {
   name: string;
   size: number;
   type: string;
+  // status: "processing" | "completed" | "failed";
+  hash?: string;
 };

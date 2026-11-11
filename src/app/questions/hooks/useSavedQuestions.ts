@@ -1,6 +1,6 @@
 "use client";
 
-import { Question } from "@/app/types/question";
+import type { Question } from "@/app/types/question";
 import { useQuery } from "@tanstack/react-query";
 
 export function useSavedQuestions() {
@@ -10,9 +10,7 @@ export function useSavedQuestions() {
     queryFn: (): Question[] => {
       const savedQuestions = localStorage.getItem("questions");
 
-      if (!savedQuestions) return [];
-
-      return JSON.parse(savedQuestions) as Question[];
+      return savedQuestions ? JSON.parse(savedQuestions) : [];
     },
 
     staleTime: Infinity,

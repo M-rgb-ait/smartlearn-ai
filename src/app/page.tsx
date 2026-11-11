@@ -9,8 +9,7 @@ export default function DashboardPage() {
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-blue-100 text-3xl dark:bg-blue-950">
             📚
           </div>
-
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+          <h1 className="min-h-10 text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:min-h-12 sm:text-4xl">
             Smart Learning
           </h1>
 

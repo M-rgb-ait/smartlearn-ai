@@ -10,7 +10,6 @@ type QuizProps = {
 function QuizComponent({ questions }: QuizProps) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState("");
 
   const score = questions.reduce((total, question, index) => {
     return total + (answers[index] === question.correctAnswer ? 1 : 0);
@@ -19,6 +18,19 @@ function QuizComponent({ questions }: QuizProps) {
   const percentage =
     questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
+  // const allAnswered = Object.keys(answers).length === questions.length;
+  const allAnswered =
+    questions.length > 0 &&
+    questions.every((question, index) => {
+      const answer = answers[index];
+
+      return (
+        Number.isInteger(answer) &&
+        answer >= 0 &&
+        answer < question.options.length
+      );
+    });
+
   function handleAnswer(questionIndex: number, optionIndex: number) {
     if (submitted) return;
 
@@ -26,24 +38,16 @@ function QuizComponent({ questions }: QuizProps) {
       ...previous,
       [questionIndex]: optionIndex,
     }));
-
-    setError("");
   }
 
   function handleSubmit() {
-    if (questions.some((_, index) => answers[index] === undefined)) {
-      setError("Please answer every question before submitting.");
-      return;
-    }
-
-    setError("");
+    if (!allAnswered) return;
     setSubmitted(true);
   }
 
   function handleRetry() {
     setAnswers({});
     setSubmitted(false);
-    setError("");
   }
 
   if (questions.length === 0) return null;
@@ -68,113 +72,109 @@ function QuizComponent({ questions }: QuizProps) {
         </div>
       )}
 
-      {questions.map((question, index) => (
-        <div
-          key={`${question.question}-${index}`}
-          className="space-y-3 rounded-xl border p-4"
-        >
-          <h3 className="font-semibold">
-            {index + 1}. {question.question}
-          </h3>
+      {questions.map((question, index) => {
+        const isCorrect = answers[index] === question.correctAnswer;
 
-          <div className="space-y-2">
-            {question.options.map((option, optionIndex) => {
-              const selected = answers[index] === optionIndex;
-              const correct = optionIndex === question.correctAnswer;
+        return (
+          <div
+            key={`${question.question}-${index}`}
+            className="space-y-3 rounded-xl border p-4"
+          >
+            <h3 className="font-semibold">
+              {index + 1}. {question.question}
+            </h3>
 
-              let optionClass =
-                "flex items-start gap-3 rounded-xl border-2 p-4 transition-all duration-200";
+            <div className="space-y-2">
+              {question.options.map((option, optionIndex) => {
+                const selected = answers[index] === optionIndex;
+                const correct = optionIndex === question.correctAnswer;
 
-              if (submitted && correct) {
-                optionClass +=
-                  " border-green-500 bg-green-50 text-green-800 dark:border-green-500 dark:bg-green-950/40 dark:text-green-300";
-              } else if (submitted && selected && !correct) {
-                optionClass +=
-                  " border-red-500 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950/40 dark:text-red-300";
-              } else if (selected) {
-                optionClass +=
-                  " border-blue-500 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300";
-              } else if (!submitted) {
-                optionClass +=
-                  " border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500 dark:hover:bg-blue-950/20";
-              } else {
-                optionClass +=
-                  " border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400";
-              }
+                let optionClass =
+                  "flex items-start gap-3 rounded-xl border-2 p-4 transition-all duration-200";
 
-              return (
-                <label
-                  key={optionIndex}
-                  className={`${optionClass} ${
-                    submitted ? "cursor-default" : "cursor-pointer"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`question-${index}`}
-                    value={optionIndex}
-                    checked={selected}
-                    disabled={submitted}
-                    onChange={() => handleAnswer(index, optionIndex)}
-                    className="mt-1 size-4 shrink-0 accent-blue-600"
-                  />
-
-                  <span className="flex-1 text-sm font-medium leading-6">
-                    {option}
-                  </span>
-
-                  {submitted && correct && (
-                    <span className="shrink-0 text-sm font-bold text-green-600 dark:text-green-400">
-                      ✓ Correct
-                    </span>
-                  )}
-
-                  {submitted && selected && !correct && (
-                    <span className="shrink-0 text-sm font-bold text-red-600 dark:text-red-400">
-                      ✕ Incorrect
-                    </span>
-                  )}
-                </label>
-              );
-            })}
-          </div>
-
-          {submitted && (
-            <div className="space-y-1 text-sm">
-              <p
-                className={
-                  answers[index] === question.correctAnswer
-                    ? "font-semibold text-green-700"
-                    : "font-semibold text-red-700"
+                if (submitted && correct) {
+                  optionClass +=
+                    " border-green-500 bg-green-50 text-green-800 dark:border-green-500 dark:bg-green-950/40 dark:text-green-300";
+                } else if (submitted && selected && !correct) {
+                  optionClass +=
+                    " border-red-500 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950/40 dark:text-red-300";
+                } else if (selected) {
+                  optionClass +=
+                    " border-blue-500 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300";
+                } else if (!submitted) {
+                  optionClass +=
+                    " border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500 dark:hover:bg-blue-950/20";
+                } else {
+                  optionClass +=
+                    " border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400";
                 }
-              >
-                {answers[index] === question.correctAnswer
-                  ? "Correct!"
-                  : "Incorrect."}
-              </p>
 
-              <p>
-                Correct answer:{" "}
-                <strong>{question.options[question.correctAnswer]}</strong>
-              </p>
+                return (
+                  <label
+                    key={optionIndex}
+                    className={`${optionClass} ${
+                      submitted ? "cursor-default" : "cursor-pointer"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`question-${index}`}
+                      value={optionIndex}
+                      checked={selected}
+                      disabled={submitted}
+                      onChange={() => handleAnswer(index, optionIndex)}
+                      className="mt-1 size-4 shrink-0 accent-blue-600"
+                    />
 
-              {question.explanation && <p>{question.explanation}</p>}
+                    <span className="flex-1 text-sm font-medium leading-6">
+                      {option}
+                    </span>
+
+                    {submitted && correct && (
+                      <span className="shrink-0 text-sm font-bold text-green-600 dark:text-green-400">
+                        ✓ Correct
+                      </span>
+                    )}
+
+                    {submitted && selected && !correct && (
+                      <span className="shrink-0 text-sm font-bold text-red-600 dark:text-red-400">
+                        ✕ Incorrect
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
             </div>
-          )}
-        </div>
-      ))}
 
-      {error && (
-        <p role="alert" className="text-red-600">
-          {error}
-        </p>
-      )}
+            {submitted && (
+              <div className="space-y-1 text-sm">
+                <p
+                  className={
+                    isCorrect
+                      ? "font-semibold text-green-700 dark:text-green-400"
+                      : "font-semibold text-red-700 dark:text-red-400"
+                  }
+                >
+                  {isCorrect ? "Correct!" : "Incorrect."}
+                </p>
+
+                <p>
+                  Correct answer:{" "}
+                  <strong>{question.options[question.correctAnswer]}</strong>
+                </p>
+
+                {question.explanation && <p>{question.explanation}</p>}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {!submitted ? (
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={Object.keys(answers).length !== questions.length}
+          disabled={!allAnswered}
           className="w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-50"
         >
           Submit Answers
